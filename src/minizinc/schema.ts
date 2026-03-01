@@ -9,6 +9,13 @@ export const ConstraintName = z.enum([
   "rightIdentity",
   "leftZero",
   "rightZero",
+  "diversity",
+  "idempotent",
+  "medial",
+  "leftDistributive",
+  "rightDistributive",
+  "leftCancellative",
+  "rightCancellative",
 ]);
 export type ConstraintName = z.infer<typeof ConstraintName>;
 

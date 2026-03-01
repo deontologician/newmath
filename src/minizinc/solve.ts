@@ -6,10 +6,11 @@ import { generateMzn } from "./generate.ts";
 let initPromise: Promise<void> | null = null;
 function ensureInit(): Promise<void> {
   if (!initPromise) {
+    const base = new URL("/wasm/", window.location.origin);
     initPromise = MiniZinc.init({
-      workerURL: "/wasm/minizinc-worker.js",
-      wasmURL: "/wasm/minizinc.wasm",
-      dataURL: "/wasm/minizinc.data",
+      workerURL: new URL("minizinc-worker.js", base).href,
+      wasmURL: new URL("minizinc.wasm", base).href,
+      dataURL: new URL("minizinc.data", base).href,
     });
   }
   return initPromise;

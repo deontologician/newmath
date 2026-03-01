@@ -5,11 +5,6 @@
   --color-text: #e0e0e0;
   --color-paren: #666;
   --color-op: #888;
-  --color-x: #ff6b6b;
-  --color-y: #4ecdc4;
-  --color-z: #ffe66d;
-  --color-redex-glow: rgba(155, 89, 182, 0.5);
-  --color-complete-glow: rgba(255, 255, 255, 0.6);
   --font-main: 'Cormorant Garamond', 'Georgia', serif;
 }
 
@@ -29,35 +24,52 @@ body {
   justify-content: center;
 }
 
+/* --- Title --- */
+
+#site-title {
+  position: fixed;
+  top: 1rem;
+  left: 1.5rem;
+  font-size: 1.4rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: #ccc;
+}
+
 #app {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  grid-template-rows: 1fr auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   gap: 3rem;
   padding: 2rem;
-  max-width: 1000px;
   width: 100%;
-  align-items: center;
 }
 
 /* --- Table --- */
 
 #table-container {
-  grid-column: 1;
-  grid-row: 1;
-  justify-self: center;
+  flex-shrink: 0;
 }
 
 .op-table {
   border-collapse: collapse;
-  font-size: 1.6rem;
+  font-size: 2rem;
   font-weight: 600;
+}
+
+.op-table-caption {
+  caption-side: top;
+  font-size: 0.85rem;
+  font-weight: 400;
+  color: #666;
+  letter-spacing: 0.03em;
+  padding-bottom: 0.5rem;
 }
 
 .op-table th,
 .op-table td {
-  width: 3rem;
-  height: 3rem;
+  width: 4rem;
+  height: 4rem;
   text-align: center;
   vertical-align: middle;
   border: 1px solid #333;
@@ -65,12 +77,24 @@ body {
 
 .op-table th {
   font-weight: 700;
-  border-color: #444;
+  background-color: #1a1a1a;
+  border-color: #555;
+}
+
+/* Thicker border between headers and data cells */
+.op-table thead th {
+  border-bottom: 2px solid #666;
+}
+
+.op-table tbody th {
+  border-right: 2px solid #666;
 }
 
 .op-table-corner {
   color: var(--color-op);
   font-weight: 400;
+  border-bottom: 2px solid #666;
+  border-right: 2px solid #666;
 }
 
 .op-table td {
@@ -78,17 +102,30 @@ body {
   transition: transform 0.15s, box-shadow 0.15s;
 }
 
-/* Cell flash animation for reduction */
+/* Row/column highlight during table lookup */
+.lookup-highlight {
+  background-color: rgba(255, 255, 255, 0.08) !important;
+  transition: background-color 0.2s ease-out;
+}
+
+.lookup-highlight-header {
+  color: #fff !important;
+  background-color: rgba(255, 255, 255, 0.2) !important;
+  transition: background-color 0.2s ease-out, color 0.2s ease-out;
+}
+
+/* Cell flash animation for the intersection */
 .cell-flash {
-  animation: cell-flash-anim 200ms ease-out;
+  animation: cell-flash-anim 400ms ease-out;
 }
 
 @keyframes cell-flash-anim {
   0% {
     transform: scale(1);
     box-shadow: none;
+    background-color: rgba(255, 255, 255, 0.3);
   }
-  50% {
+  40% {
     transform: scale(1.3);
     box-shadow: 0 0 20px rgba(255, 255, 255, 0.5);
   }
@@ -101,15 +138,19 @@ body {
 /* --- Expression --- */
 
 #expr-container {
-  grid-column: 2;
-  grid-row: 1;
-  font-size: 2.4rem;
+  font-size: 5rem;
   font-weight: 600;
   line-height: 1.6;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   min-height: 4rem;
+  gap: 0.75rem;
+  width: 100%;
+  text-align: center;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .expr-root {
@@ -134,53 +175,86 @@ body {
 .redex-group {
   display: inline;
   cursor: pointer;
-  border-radius: 4px;
-  padding: 0 2px;
-  transition: text-shadow 0.2s, background-color 0.2s;
+  border-radius: 8px;
+  padding: 2px 4px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+  transition: text-shadow 0.2s, background-color 0.2s, box-shadow 0.2s, border-color 0.2s;
   outline: none;
 }
 
 .redex-group:hover,
 .redex-group:focus-visible {
-  text-shadow: 0 0 12px var(--color-redex-glow), 0 0 24px var(--color-redex-glow);
-  background-color: rgba(155, 89, 182, 0.1);
+  border-bottom-color: rgba(255, 255, 255, 0.3);
 }
 
-/* Completed expression: final symbol glow */
+/* --- Symbol & operator glyphs --- */
+
+.symbol-glyph {
+  height: 1.2em;
+  width: auto;
+  vertical-align: middle;
+  mix-blend-mode: screen;
+  pointer-events: none;
+  user-select: none;
+}
+
+.operator-glyph {
+  height: 0.8em;
+  width: auto;
+  vertical-align: middle;
+  mix-blend-mode: screen;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* Completed expression: equation reveal */
+.expr-equation-lhs {
+  display: inline;
+  animation: slide-in-left 0.6s ease-out both;
+}
+
+/* Completed expression: gentle pulse */
 .expr-complete .expr-symbol {
-  animation: complete-glow 1.5s ease-in-out infinite alternate;
+  animation: complete-pulse 2s ease-in-out infinite alternate;
 }
 
-@keyframes complete-glow {
+@keyframes slide-in-left {
   from {
-    text-shadow: 0 0 10px var(--color-complete-glow);
+    opacity: 0;
+    transform: translateX(-1em);
   }
   to {
-    text-shadow: 0 0 30px var(--color-complete-glow), 0 0 50px var(--color-complete-glow);
+    opacity: 1;
+    transform: translateX(0);
   }
+}
+
+@keyframes complete-pulse {
+  from { opacity: 0.7; }
+  to { opacity: 1; }
+}
+
+/* Header glow during lookup animation */
+.lookup-highlight-header .symbol-glyph {
+  filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.8));
 }
 
 /* Flyer (animated symbol moving from table to expression) */
 .flyer {
-  font-family: var(--font-main);
-  font-size: 2.4rem;
-  font-weight: 700;
   pointer-events: none;
 }
 
-/* Reduction result fade-in */
-.reduction-result {
-  display: inline;
+.flyer .symbol-glyph {
+  height: auto;
 }
 
 /* --- Buttons --- */
 
 #controls {
-  grid-column: 1 / -1;
-  grid-row: 2;
   display: flex;
-  gap: 1rem;
+  gap: 1.5rem;
   justify-content: center;
+  align-items: start;
 }
 
 button {
@@ -205,29 +279,184 @@ button:active {
   border-color: #aaa;
 }
 
+/* --- New Math group (button + constraint toggles) --- */
+
+#new-math-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.constraint-toggles {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.4rem;
+  max-width: 22rem;
+}
+
+.constraint-toggle {
+  font-family: system-ui, sans-serif;
+  font-style: normal;
+  font-size: 0.85rem;
+  font-weight: 500;
+  padding: 0.35rem 0.9rem;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  color: #888;
+  background: transparent;
+  cursor: pointer;
+  transition: color 0.2s, border-color 0.2s, background-color 0.2s;
+}
+
+.constraint-toggle:hover {
+  color: #bbb;
+  border-color: #555;
+}
+
+.constraint-toggle.active {
+  color: #fff;
+  font-weight: 600;
+  border-color: #666;
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+/* Nudge: briefly highlight New Math when constraints change */
+#new-table-btn.nudge {
+  animation: btn-nudge 0.4s ease-out;
+}
+
+@keyframes btn-nudge {
+  0% { border-color: #888; color: #fff; }
+  100% { border-color: #444; color: var(--color-text); }
+}
+
+/* Pulse on buttons after expression is fully reduced */
+.btn-pulse {
+  animation: btn-pulse-anim 1.2s ease-in-out infinite alternate;
+}
+
+@keyframes btn-pulse-anim {
+  from { border-color: #555; color: var(--color-text); }
+  to { border-color: #aaa; color: #fff; }
+}
+
+/* --- Solver states --- */
+
+button.solving {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+#solver-message {
+  font-size: 0.85rem;
+  color: #888;
+  text-align: center;
+  min-height: 1.2em;
+}
+
+#solver-message.visible {
+  animation: fade-out 3s ease-out forwards;
+}
+
+@keyframes fade-out {
+  0% { opacity: 1; }
+  70% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* --- Favorites --- */
+
+#favorites {
+  position: fixed;
+  left: 1.5rem;
+  top: 3rem;
+  display: flex;
+  flex-direction: column;
+  align-items: start;
+  gap: 0.4rem;
+}
+
+.favorites-label {
+  font-family: system-ui, sans-serif;
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: #555;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.favorites-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.favorite-item {
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+}
+
+.favorite-load {
+  display: flex;
+  gap: 0.2rem;
+  align-items: center;
+  padding: 0.3rem 0.5rem;
+  border: 1px solid #333;
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+
+.favorite-load:hover {
+  border-color: #777;
+}
+
+.favorite-glyph {
+  height: 1.4em;
+  width: auto;
+  mix-blend-mode: screen;
+  pointer-events: none;
+}
+
+.favorite-op-glyph {
+  height: 1em;
+  margin-right: 0.3rem;
+}
+
+.favorite-set-punct {
+  color: #555;
+  font-size: 0.85rem;
+}
+
+.favorite-delete {
+  font-family: system-ui, sans-serif;
+  font-size: 0.85rem;
+  font-weight: 400;
+  padding: 0.1rem 0.35rem;
+  border: none;
+  background: transparent;
+  color: #444;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.favorite-delete:hover {
+  color: #aaa;
+}
+
 /* --- Responsive --- */
 
 @media (max-width: 640px) {
   #app {
-    grid-template-columns: 1fr;
-    grid-template-rows: auto auto auto;
     gap: 2rem;
     padding: 1.5rem;
   }
 
-  #table-container {
-    grid-column: 1;
-    grid-row: 1;
-  }
-
   #expr-container {
-    grid-column: 1;
-    grid-row: 2;
-    font-size: 1.8rem;
-  }
-
-  #controls {
-    grid-column: 1;
-    grid-row: 3;
+    font-size: 2.5rem;
   }
 }

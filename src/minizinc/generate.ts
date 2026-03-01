@@ -24,7 +24,17 @@ export function generateMzn(config: SolverConfig): string {
     .map((name) => constraintRegistry[name].mzn)
     .join("\n");
 
-  const solve = "solve satisfy;";
+  // Random weights bias the solver toward different satisfying assignments
+  // each time, without affecting feasibility.
+  const weights = Array.from({ length: symbolCount * symbolCount }, () =>
+    Math.floor(Math.random() * 201) - 100
+  );
+  const objectiveTerms = weights.map((w, idx) => {
+    const r = Math.floor(idx / symbolCount) + 1;
+    const c = (idx % symbolCount) + 1;
+    return `${String(w)} * op[${String(r)},${String(c)}]`;
+  });
+  const solve = `solve maximize ${objectiveTerms.join(" + ")};`;
 
   // Human-readable output for CLI debugging; WASM path uses JSON mode.
   const output = [

@@ -1,5 +1,5 @@
 import type { OpTable } from './types.ts';
-import { SYMBOL_NAMES, SYMBOL_COLORS, OP_SYMBOL } from '../symbols.ts';
+import { createSymbolEl, createOperatorEl } from '../symbols.ts';
 
 /** Render an OpTable as a DOM <table> element. */
 export function renderTable(table: OpTable): HTMLTableElement {
@@ -10,14 +10,15 @@ export function renderTable(table: OpTable): HTMLTableElement {
   const thead = el.createTHead();
   const headerRow = thead.insertRow();
   const corner = document.createElement('th');
-  corner.textContent = OP_SYMBOL;
   corner.className = 'op-table-corner';
+  corner.appendChild(createOperatorEl());
   headerRow.appendChild(corner);
 
   for (let c = 0; c < table.size; c++) {
     const th = document.createElement('th');
-    th.textContent = SYMBOL_NAMES[c];
-    th.style.color = SYMBOL_COLORS[c];
+    th.id = `col-header-${c}`;
+    th.dataset.col = String(c);
+    th.appendChild(createSymbolEl(c));
     headerRow.appendChild(th);
   }
 
@@ -25,18 +26,20 @@ export function renderTable(table: OpTable): HTMLTableElement {
   const tbody = el.createTBody();
   for (let r = 0; r < table.size; r++) {
     const row = tbody.insertRow();
+    row.dataset.row = String(r);
     const rowHeader = document.createElement('th');
-    rowHeader.textContent = SYMBOL_NAMES[r];
-    rowHeader.style.color = SYMBOL_COLORS[r];
+    rowHeader.id = `row-header-${r}`;
+    rowHeader.appendChild(createSymbolEl(r));
     row.appendChild(rowHeader);
 
     for (let c = 0; c < table.size; c++) {
       const td = row.insertCell();
       const val = table.cells[r][c];
       td.id = `cell-${r}-${c}`;
+      td.dataset.row = String(r);
+      td.dataset.col = String(c);
       td.dataset.value = String(val);
-      td.textContent = SYMBOL_NAMES[val];
-      td.style.color = SYMBOL_COLORS[val];
+      td.appendChild(createSymbolEl(val));
     }
   }
 
