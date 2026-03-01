@@ -1,8 +1,8 @@
 import './style.css';
 import type { Expr, OpNode } from './expr/tree.ts';
-import { findRedexes, randomExpr, reduce, isRedex } from './expr/tree.ts';
-import { renderExpr } from './expr/render.ts';
-import { animateReduction } from './expr/animate.ts';
+import { findRedexes, randomExpr, reduce, isRedex, sym, op } from './expr/tree.ts';
+import { renderExpr, renderExprFlat } from './expr/render.ts';
+import { animateReduction, animateFlatReduction } from './expr/animate.ts';
 import type { OpTable } from './table/types.ts';
 import { lookup, randomTable, fromSolverResult } from './table/types.ts';
 import { renderTable } from './table/render.ts';
@@ -12,6 +12,56 @@ import type { ConstraintName } from './minizinc/index.ts';
 
 const SYMBOL_COUNT = 4;
 
+// --- Favorites (types + storage helpers, needed before initial glyph pick) ---
+
+interface SavedMath {
+  table: OpTable;
+  constraints: ConstraintName[];
+  glyphs: { symbols: number[]; operator: number | null };
+}
+
+const STORAGE_KEY = 'newmath-favorites';
+
+function loadFavorites(): SavedMath[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+function storeFavorites(favs: SavedMath[]): void {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(favs));
+}
+
+/** Collect all glyph IDs used by saved favorites so new math avoids them. */
+function getFavoriteExclusions(): { symbols: Set<number>; operators: Set<number> } {
+  const symbols = new Set<number>();
+  const operators = new Set<number>();
+  for (const fav of loadFavorites()) {
+    for (const id of fav.glyphs.symbols) symbols.add(id);
+    if (fav.glyphs.operator !== null) operators.add(fav.glyphs.operator);
+  }
+  return { symbols, operators };
+}
+
+// ---
+
+/** Extract leaf symbol values in left-to-right order. */
+function flattenLeaves(expr: Expr): number[] {
+  if (expr.kind === 'symbol') return [expr.value];
+  return [...flattenLeaves(expr.left), ...flattenLeaves(expr.right)];
+}
+
+/** Rebuild a left-leaning tree from leaf values. */
+function leavesToTree(values: number[]): Expr {
+  let tree: Expr = sym(values[0]);
+  for (let i = 1; i < values.length; i++) {
+    tree = op(tree, sym(values[i]));
+  }
+  return tree;
+}
 
 interface AppState {
   table: OpTable;
@@ -23,7 +73,7 @@ interface AppState {
   solving: boolean;
 }
 
-randomizeGlyphs(SYMBOL_COUNT);
+randomizeGlyphs(SYMBOL_COUNT, getFavoriteExclusions());
 
 const initialExpr = randomExpr(SYMBOL_COUNT, 5);
 const state: AppState = {
@@ -37,11 +87,21 @@ const state: AppState = {
 };
 
 const tableContainer = document.getElementById('table-container')!;
+const activeConstraintsEl = document.getElementById('active-constraints')!;
 const exprContainer = document.getElementById('expr-container')!;
 const newExprBtn = document.getElementById('new-expr-btn')!;
 const newTableBtn = document.getElementById('new-table-btn')!;
 const solverMessage = document.getElementById('solver-message')!;
 const constraintToggles = document.querySelectorAll<HTMLButtonElement>('.constraint-toggle');
+
+// Build label map from the toggle buttons
+const constraintLabels = new Map<ConstraintName, string>();
+for (const btn of constraintToggles) {
+  constraintLabels.set(
+    btn.dataset.constraint as ConstraintName,
+    btn.textContent!.trim(),
+  );
+}
 
 function renderAll() {
   renderTableView();
@@ -51,6 +111,32 @@ function renderAll() {
 function renderTableView() {
   tableContainer.innerHTML = '';
   tableContainer.appendChild(renderTable(state.table));
+
+  activeConstraintsEl.innerHTML = '';
+  if (state.selectedConstraints.size === 0) return;
+
+  for (const name of state.selectedConstraints) {
+    const label = constraintLabels.get(name);
+    if (!label) continue;
+    const el = document.createElement('div');
+    el.className = 'active-constraint';
+    el.textContent = label;
+    activeConstraintsEl.appendChild(el);
+  }
+}
+
+function appendEquationSuffix(element: HTMLElement) {
+  if (!state.reducedSymbol) return;
+  element.classList.add('expr-complete');
+
+  const eq = document.createElement('span');
+  eq.className = 'expr-equation-lhs expr-op';
+  eq.textContent = ' = ';
+
+  const { element: resultEl } = renderExpr(state.reducedSymbol);
+  resultEl.classList.remove('expr-root');
+
+  element.append(eq, resultEl);
 }
 
 function renderExprView() {
@@ -63,22 +149,55 @@ function renderExprView() {
     newTableBtn.classList.add('btn-pulse');
   }
 
-  const { element, nodeMap } = renderExpr(state.expr);
+  const associative = state.selectedConstraints.has('associativity');
 
-  // If we have a final answer, append " = result" after the expression
-  if (state.reducedSymbol) {
-    element.classList.add('expr-complete');
+  // Flat rendering for associative operations: every adjacent pair is reducible
+  if (associative) {
+    const leaves = flattenLeaves(state.expr);
+    const { element, opIndexMap } = renderExprFlat(leaves);
 
-    const eq = document.createElement('span');
-    eq.className = 'expr-equation-lhs expr-op';
-    eq.textContent = ' = ';
+    appendEquationSuffix(element);
+    exprContainer.appendChild(element);
 
-    const { element: resultEl } = renderExpr(state.reducedSymbol);
-    resultEl.classList.remove('expr-root');
+    // Each operator is a click target that reduces the pair around it
+    const flatOps = element.querySelectorAll('.flat-redex');
+    for (const el of flatOps) {
+      const htmlEl = el as HTMLElement;
+      const idx = opIndexMap.get(htmlEl);
+      if (idx === undefined) continue;
 
-    element.append(eq, resultEl);
+      const handler = () => {
+        if (state.animating || state.solving) return;
+        state.animating = true;
+
+        animateFlatReduction(htmlEl, leaves[idx], leaves[idx + 1], state.table, () => {
+          const result = lookup(state.table, leaves[idx], leaves[idx + 1]);
+          const newLeaves = [...leaves];
+          newLeaves.splice(idx, 2, result);
+          if (newLeaves.length === 1) {
+            state.reducedSymbol = sym(newLeaves[0]);
+          }
+          state.expr = leavesToTree(newLeaves);
+          state.animating = false;
+          renderExprView();
+        });
+      };
+
+      htmlEl.addEventListener('click', handler);
+      htmlEl.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          handler();
+        }
+      });
+    }
+    return;
   }
 
+  // Tree rendering for non-associative operations
+  const { element, nodeMap } = renderExpr(state.expr);
+
+  appendEquationSuffix(element);
   exprContainer.appendChild(element);
 
   // Attach click handlers to redex groups
@@ -176,7 +295,7 @@ newTableBtn.addEventListener('click', async () => {
 
   newExprBtn.classList.remove('btn-pulse');
   newTableBtn.classList.remove('btn-pulse');
-  randomizeGlyphs(SYMBOL_COUNT);
+  randomizeGlyphs(SYMBOL_COUNT, getFavoriteExclusions());
 
   setSolving(true);
   try {
@@ -210,30 +329,10 @@ function ensureReducible() {
   }
 }
 
-// --- Favorites ---
+// --- Favorites (UI) ---
 
-interface SavedMath {
-  table: OpTable;
-  constraints: ConstraintName[];
-  glyphs: { symbols: number[]; operator: number | null };
-}
-
-const STORAGE_KEY = 'newmath-favorites';
 const saveBtn = document.getElementById('save-btn')!;
 const favoritesContainer = document.getElementById('favorites')!;
-
-function loadFavorites(): SavedMath[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
-  }
-}
-
-function storeFavorites(favs: SavedMath[]): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(favs));
-}
 
 function renderFavorites(): void {
   const favs = loadFavorites();
