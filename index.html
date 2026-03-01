@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>new math</title>
+    <script type="module" crossorigin src="/newmath/assets/index-BRUWtjhC.js"></script>
+    <link rel="stylesheet" crossorigin href="/newmath/assets/index-AiTeChNO.css">
+  </head>
+  <body>
+    <h1 id="site-title">new math.</h1>
+    <div id="app">
+      <div id="table-area">
+        <div id="table-container"></div>
+        <div id="active-constraints"></div>
+        <button id="save-btn">save</button>
+      </div>
+      <div id="expr-area">
+        <button id="new-expr-btn">&#x27f3;</button>
+        <div id="expr-container"></div>
+      </div>
+      <div id="controls">
+        <div id="new-math-group">
+          <button id="new-table-btn">new math</button>
+          <div class="constraint-toggles">
+            <button class="constraint-toggle" data-constraint="associativity">(a·b)·c = a·(b·c)</button>
+            <button class="constraint-toggle" data-constraint="commutativity">a·b = b·a</button>
+            <button class="constraint-toggle" data-constraint="leftIdentity">e·a = a</button>
+            <button class="constraint-toggle" data-constraint="rightIdentity">a·e = a</button>
+            <button class="constraint-toggle" data-constraint="leftZero">z·a = z</button>
+            <button class="constraint-toggle" data-constraint="rightZero">a·z = z</button>
+            <button class="constraint-toggle" data-constraint="idempotent">a·a = a</button>
+            <button class="constraint-toggle" data-constraint="medial">(a·b)·(c·d) = (a·c)·(b·d)</button>
+            <button class="constraint-toggle" data-constraint="leftDistributive">a·(b·c) = (a·b)·(a·c)</button>
+            <button class="constraint-toggle" data-constraint="rightDistributive">(b·c)·a = (b·a)·(c·a)</button>
+            <button class="constraint-toggle" data-constraint="leftCancellative">a·b = a·c → b = c</button>
+            <button class="constraint-toggle" data-constraint="rightCancellative">b·a = c·a → b = c</button>
+          </div>
+          <div id="solver-message"></div>
+        </div>
+      </div>
+    </div>
+    <div id="favorites"></div>
+  </body>
+</html>
