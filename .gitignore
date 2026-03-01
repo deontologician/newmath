@@ -26,6 +26,12 @@ dist-ssr
 # Nix
 result
 
+# Claude Code
+.claude/worktrees
+
+# MiniZinc WASM (copied by postinstall)
+public/wasm/
+
 # Environment
 .env
 .env.local

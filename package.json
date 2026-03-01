@@ -6,10 +6,15 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "postinstall": "mkdir -p public/wasm && cp node_modules/minizinc/dist/minizinc-worker.js node_modules/minizinc/dist/minizinc.wasm node_modules/minizinc/dist/minizinc.data public/wasm/"
   },
   "devDependencies": {
     "typescript": "~5.9.3",
     "vite": "^7.3.1"
+  },
+  "dependencies": {
+    "minizinc": "^4.4.5",
+    "zod": "^4.3.6"
   }
 }
