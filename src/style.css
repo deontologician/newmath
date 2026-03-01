@@ -18,6 +18,7 @@ body {
   background-color: var(--color-bg);
   color: var(--color-text);
   font-family: var(--font-main);
+  text-transform: lowercase;
   min-height: 100vh;
   display: flex;
   align-items: center;
@@ -58,6 +59,17 @@ body {
   flex-shrink: 0;
 }
 
+#save-btn {
+  align-self: center;
+  margin-left: 0.5rem;
+}
+
+#save-btn.hidden,
+#save-btn.duplicate {
+  visibility: hidden;
+  pointer-events: none;
+}
+
 #active-constraints {
   display: flex;
   flex-direction: column;
@@ -66,11 +78,47 @@ body {
 }
 
 .active-constraint {
+  white-space: nowrap;
+}
+
+.active-constraint + .active-constraint {
+  margin-top: 0.15rem;
+}
+
+.active-constraint-demoable {
+  cursor: pointer;
+  border-radius: 4px;
+  padding: 0.2rem 0.4rem;
+  margin: -0.2rem -0.4rem;
+  transition: background-color 0.2s;
+}
+
+.active-constraint-demoable:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.active-constraint-selected {
+  border-left: 2px solid #888;
+  padding-left: 0.6rem;
+}
+
+.active-constraint-selected .active-constraint-name {
+  color: #ddd;
+}
+
+.active-constraint-name {
   font-family: system-ui, sans-serif;
   font-size: 0.8rem;
+  font-weight: 500;
+  color: #999;
+}
+
+.active-constraint-eq {
+  font-family: system-ui, sans-serif;
+  font-size: 0.7rem;
   font-weight: 400;
-  color: #666;
-  white-space: nowrap;
+  color: #555;
+  padding-left: 0.6rem;
 }
 
 .op-table {
@@ -270,6 +318,24 @@ body {
   to { opacity: 1; }
 }
 
+/* Property demo: equation fully reduced on both sides */
+.property-equation-complete .expr-symbol {
+  animation: complete-pulse 2s ease-in-out infinite alternate;
+}
+
+.property-equals {
+  font-size: 0.8em;
+}
+
+.property-demo-label {
+  font-family: system-ui, sans-serif;
+  font-size: 1.2rem;
+  font-weight: 500;
+  color: #999;
+  letter-spacing: 0.05em;
+  text-align: center;
+}
+
 /* Header glow during lookup animation */
 .lookup-highlight-header .symbol-glyph {
   filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.8));
@@ -420,7 +486,6 @@ button.solving {
   font-weight: 500;
   color: #555;
   letter-spacing: 0.1em;
-  text-transform: uppercase;
 }
 
 .favorites-list {
@@ -449,6 +514,11 @@ button.solving {
 
 .favorite-load:hover {
   border-color: #777;
+}
+
+.favorite-load.active {
+  border-color: #888;
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.15);
 }
 
 .favorite-glyph {
@@ -482,6 +552,28 @@ button.solving {
 
 .favorite-delete:hover {
   color: #aaa;
+}
+
+/* --- Save flyer animation --- */
+
+.save-flyer {
+  position: fixed;
+  z-index: 1000;
+  pointer-events: none;
+  display: flex;
+  gap: 0.2rem;
+  align-items: center;
+  padding: 0.3rem 0.5rem;
+  border: 1px solid #333;
+  border-radius: 6px;
+  background: transparent;
+}
+
+.save-flyer-text {
+  font-family: var(--font-main);
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--color-text);
 }
 
 /* --- Responsive --- */

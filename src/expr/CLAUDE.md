@@ -12,6 +12,11 @@ Expression tree module for algebraic reduction.
   nodes.
 - **animate.ts** — 4-phase reduction animation: flash table cell, fly result
   symbol to redex position, collapse old redex, re-space.
+- **properties.ts** — Property demo mode: `PropertyTemplate` registry mapping
+  equation-based constraints to LHS/RHS expression builders, element finders
+  (`findIdentity`, `findZero`), and `randomizePropertyVars` for generating
+  concrete symbol assignments that pin special vars (identity/zero) to their
+  discovered elements.
 
 ## Key concepts
 

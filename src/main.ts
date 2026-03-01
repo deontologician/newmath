@@ -82,6 +82,7 @@ interface AppState {
   selectedConstraints: Set<ConstraintName>;
   solving: boolean;
   propertyDemo: PropertyDemo | null;
+  activeFavoriteIndex: number | null;
 }
 
 randomizeGlyphs(SYMBOL_COUNT, getFavoriteExclusions());
@@ -96,6 +97,7 @@ const state: AppState = {
   selectedConstraints: new Set(),
   solving: false,
   propertyDemo: null,
+  activeFavoriteIndex: null,
 };
 
 const tableContainer = document.getElementById('table-container')!;
@@ -134,6 +136,7 @@ for (const btn of constraintToggles) {
 function renderAll() {
   renderTableView();
   renderExprView();
+  updateSaveBtnVisibility();
 }
 
 function renderTableView() {
@@ -199,6 +202,12 @@ function renderPropertyDemo() {
   const lhsDone = demo.lhs.kind === 'symbol';
   const rhsDone = demo.rhs.kind === 'symbol';
   const bothDone = lhsDone && rhsDone;
+
+  // Property name label
+  const label = document.createElement('div');
+  label.className = 'property-demo-label';
+  label.textContent = constraintNames[demo.constraint] ?? demo.constraint;
+  exprContainer.appendChild(label);
 
   // Container for LHS = RHS
   const wrapper = document.createElement('span');
@@ -434,6 +443,9 @@ for (const btn of constraintToggles) {
       state.selectedConstraints.add(name);
       btn.classList.add('active');
     }
+    state.activeFavoriteIndex = null;
+    updateSaveBtnVisibility();
+    renderFavorites();
     // Nudge the New Math button to signal "regenerate to apply"
     newTableBtn.classList.remove('nudge');
     void newTableBtn.offsetWidth;
@@ -477,12 +489,14 @@ newTableBtn.addEventListener('click', async () => {
     });
     state.table = fromSolverResult(result.op);
     state.propertyDemo = null;
+    state.activeFavoriteIndex = null;
     const e2 = randomExpr(SYMBOL_COUNT, 5);
     state.expr = e2;
     state.originalExpr = e2;
     state.reducedSymbol = null;
     ensureReducible();
     renderAll();
+    renderFavorites();
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Solver error';
     showSolverMessage(msg);
@@ -507,6 +521,72 @@ function ensureReducible() {
 const saveBtn = document.getElementById('save-btn')!;
 const favoritesContainer = document.getElementById('favorites')!;
 
+/** Check if the current math is already saved as a favorite. */
+function isDuplicateMath(): boolean {
+  const favs = loadFavorites();
+  const currentCells = state.table.cells;
+  const currentConstraints = [...state.selectedConstraints].sort();
+  const currentGlyphs = getGlyphState();
+  return favs.some((fav) => {
+    if (fav.table.size !== state.table.size) return false;
+    const favCells = fav.table.cells;
+    for (let r = 0; r < currentCells.length; r++) {
+      for (let c = 0; c < currentCells[r].length; c++) {
+        if (favCells[r][c] !== currentCells[r][c]) return false;
+      }
+    }
+    const favConstraints = [...fav.constraints].sort();
+    if (favConstraints.length !== currentConstraints.length) return false;
+    if (!favConstraints.every((v, i) => v === currentConstraints[i])) return false;
+    if (fav.glyphs.operator !== currentGlyphs.operator) return false;
+    if (fav.glyphs.symbols.length !== currentGlyphs.symbols.length) return false;
+    if (!fav.glyphs.symbols.every((v, i) => v === currentGlyphs.symbols[i])) return false;
+    return true;
+  });
+}
+
+/** Update save button visibility/state based on active favorite and duplicate status. */
+function updateSaveBtnVisibility(): void {
+  saveBtn.classList.remove('hidden', 'duplicate');
+  if (state.activeFavoriteIndex !== null) {
+    saveBtn.classList.add('hidden');
+    saveBtn.textContent = 'save';
+  } else if (isDuplicateMath()) {
+    saveBtn.classList.add('duplicate');
+    saveBtn.textContent = 'saved';
+  } else {
+    saveBtn.textContent = 'save';
+  }
+}
+
+/** Build the set-notation DOM content (operator glyph + { sym1, sym2, ... }) for a favorite. */
+function buildFavoriteContent(container: HTMLElement, glyphs: SavedMath['glyphs']): void {
+  if (glyphs.operator !== null) {
+    const opImg = document.createElement('img');
+    opImg.src = `${import.meta.env.BASE_URL}operators/${String(glyphs.operator).padStart(4, '0')}.webp`;
+    opImg.className = 'favorite-glyph favorite-op-glyph';
+    opImg.draggable = false;
+    container.appendChild(opImg);
+  }
+
+  const setText = (t: string) => {
+    const span = document.createElement('span');
+    span.className = 'favorite-set-punct';
+    span.textContent = t;
+    container.appendChild(span);
+  };
+  setText('{ ');
+  glyphs.symbols.forEach((id, j) => {
+    if (j > 0) setText(', ');
+    const img = document.createElement('img');
+    img.src = `${import.meta.env.BASE_URL}symbols/${String(id).padStart(4, '0')}.webp`;
+    img.className = 'favorite-glyph';
+    img.draggable = false;
+    container.appendChild(img);
+  });
+  setText(' }');
+}
+
 function renderFavorites(): void {
   const favs = loadFavorites();
   favoritesContainer.innerHTML = '';
@@ -526,38 +606,15 @@ function renderFavorites(): void {
 
     const loadBtn = document.createElement('button');
     loadBtn.className = 'favorite-load';
+    if (state.activeFavoriteIndex === i) loadBtn.classList.add('active');
 
-    // Operator glyph
-    if (fav.glyphs.operator !== null) {
-      const opImg = document.createElement('img');
-      opImg.src = `${import.meta.env.BASE_URL}operators/${String(fav.glyphs.operator).padStart(4, '0')}.webp`;
-      opImg.className = 'favorite-glyph favorite-op-glyph';
-      opImg.draggable = false;
-      loadBtn.appendChild(opImg);
-    }
-
-    // Set notation: { sym1, sym2, ... }
-    const setText = (t: string) => {
-      const span = document.createElement('span');
-      span.className = 'favorite-set-punct';
-      span.textContent = t;
-      loadBtn.appendChild(span);
-    };
-    setText('{ ');
-    fav.glyphs.symbols.forEach((id, j) => {
-      if (j > 0) setText(', ');
-      const img = document.createElement('img');
-      img.src = `${import.meta.env.BASE_URL}symbols/${String(id).padStart(4, '0')}.webp`;
-      img.className = 'favorite-glyph';
-      img.draggable = false;
-      loadBtn.appendChild(img);
-    });
-    setText(' }');
+    buildFavoriteContent(loadBtn, fav.glyphs);
     loadBtn.addEventListener('click', () => {
       if (state.animating || state.solving) return;
       setGlyphState(fav.glyphs);
       state.table = fav.table;
       state.propertyDemo = null;
+      state.activeFavoriteIndex = i;
       const e = randomExpr(fav.table.size, 5);
       state.expr = e;
       state.originalExpr = e;
@@ -572,6 +629,7 @@ function renderFavorites(): void {
       newTableBtn.classList.remove('btn-pulse');
       ensureReducible();
       renderAll();
+      renderFavorites();
     });
 
     const delBtn = document.createElement('button');
@@ -581,7 +639,13 @@ function renderFavorites(): void {
       const f = loadFavorites();
       f.splice(i, 1);
       storeFavorites(f);
+      if (state.activeFavoriteIndex === i) {
+        state.activeFavoriteIndex = null;
+      } else if (state.activeFavoriteIndex !== null && i < state.activeFavoriteIndex) {
+        state.activeFavoriteIndex--;
+      }
       renderFavorites();
+      updateSaveBtnVisibility();
     });
 
     item.append(loadBtn, delBtn);
@@ -591,19 +655,98 @@ function renderFavorites(): void {
   favoritesContainer.appendChild(list);
 }
 
+function animateSave(): void {
+  state.animating = true;
+  const glyphs = getGlyphState();
+
+  // Get button position
+  const btnRect = saveBtn.getBoundingClientRect();
+
+  // Create flyer at button position
+  const flyer = document.createElement('div');
+  flyer.className = 'save-flyer';
+  flyer.style.left = `${btnRect.left}px`;
+  flyer.style.top = `${btnRect.top}px`;
+
+  // "save" text (fades out)
+  const saveText = document.createElement('span');
+  saveText.className = 'save-flyer-text';
+  saveText.textContent = 'save';
+  flyer.appendChild(saveText);
+
+  // Set-notation content (fades in)
+  const setContent = document.createElement('span');
+  setContent.style.display = 'flex';
+  setContent.style.alignItems = 'center';
+  setContent.style.gap = '0.2rem';
+  setContent.style.opacity = '0';
+  buildFavoriteContent(setContent, glyphs);
+  flyer.appendChild(setContent);
+
+  // Hide real button
+  saveBtn.classList.add('hidden');
+  document.body.appendChild(flyer);
+
+  // Calculate target position (end of sidebar favorites list)
+  const lastItem = favoritesContainer.querySelector('.favorite-item:last-child');
+  let targetX: number;
+  let targetY: number;
+  if (lastItem) {
+    const lastRect = lastItem.getBoundingClientRect();
+    targetX = lastRect.left;
+    targetY = lastRect.bottom + 8;
+  } else {
+    // No favorites yet — position below the "saved" label area
+    targetX = 24; // 1.5rem
+    targetY = 68; // 3rem + label height ~
+  }
+
+  // Animate: fly + morph
+  const dx = targetX - btnRect.left;
+  const dy = targetY - btnRect.top;
+
+  flyer.animate(
+    [
+      { transform: 'translate(0, 0)' },
+      { transform: `translate(${dx}px, ${dy}px)` },
+    ],
+    { duration: 700, easing: 'cubic-bezier(0.4, 0, 0.2, 1)', fill: 'forwards' },
+  );
+
+  // Crossfade: save text out, set content in
+  saveText.animate(
+    [{ opacity: '1' }, { opacity: '0' }],
+    { duration: 300, easing: 'ease-out', fill: 'forwards' },
+  );
+
+  setContent.animate(
+    [{ opacity: '0' }, { opacity: '1' }],
+    { duration: 400, easing: 'ease-in', delay: 200, fill: 'forwards' },
+  );
+
+  // On completion: persist and clean up
+  setTimeout(() => {
+    flyer.remove();
+
+    const favs = loadFavorites();
+    favs.push({
+      table: state.table,
+      constraints: [...state.selectedConstraints],
+      glyphs,
+    });
+    storeFavorites(favs);
+    renderFavorites();
+
+    state.animating = false;
+    updateSaveBtnVisibility();
+  }, 700);
+}
+
 saveBtn.addEventListener('click', () => {
   if (state.animating || state.solving) return;
-  const favs = loadFavorites();
-  favs.push({
-    table: state.table,
-    constraints: [...state.selectedConstraints],
-    glyphs: getGlyphState(),
-  });
-  storeFavorites(favs);
-  renderFavorites();
-  // Brief feedback
-  saveBtn.textContent = 'saved!';
-  setTimeout(() => { saveBtn.textContent = 'save'; }, 1000);
+  if (state.activeFavoriteIndex !== null) return;
+  if (isDuplicateMath()) return;
+  animateSave();
 });
 
 ensureReducible();
