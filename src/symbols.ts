@@ -26,10 +26,16 @@ let currentOperator: number | null = null;
 /** The text fallback for the binary operation symbol. */
 export const OP_SYMBOL = '\u25CB'; // ○
 
-/** Pick `count` random symbol glyphs and one operator glyph. */
-export function randomizeGlyphs(count: number): void {
-  // Fisher-Yates sample
-  const pool = [...SYMBOL_GLYPH_IDS];
+/** Pick `count` random symbol glyphs and one operator glyph, avoiding excluded IDs. */
+export function randomizeGlyphs(
+  count: number,
+  exclude?: { symbols?: Set<number>; operators?: Set<number> },
+): void {
+  const exSym = exclude?.symbols;
+  const exOp = exclude?.operators;
+
+  // Fisher-Yates sample from non-excluded symbols
+  const pool = exSym ? SYMBOL_GLYPH_IDS.filter(id => !exSym.has(id)) : [...SYMBOL_GLYPH_IDS];
   const picked: number[] = [];
   for (let i = 0; i < count && pool.length > 0; i++) {
     const j = Math.floor(Math.random() * pool.length);
@@ -39,9 +45,9 @@ export function randomizeGlyphs(count: number): void {
   }
   currentSymbols = picked;
 
-  if (OPERATOR_GLYPH_IDS.length > 0) {
-    currentOperator =
-      OPERATOR_GLYPH_IDS[Math.floor(Math.random() * OPERATOR_GLYPH_IDS.length)];
+  const opPool = exOp ? OPERATOR_GLYPH_IDS.filter(id => !exOp.has(id)) : OPERATOR_GLYPH_IDS;
+  if (opPool.length > 0) {
+    currentOperator = opPool[Math.floor(Math.random() * opPool.length)];
   } else {
     currentOperator = null;
   }
