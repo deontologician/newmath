@@ -22,6 +22,9 @@
             pkgs.nodejs_22
             pkgs.corepack_22
 
+            # Python (for scripts/generate-images.py)
+            pkgs.python3
+
             # MiniZinc + HiGHS solver
             pkgs.minizinc
             pkgs.highs
