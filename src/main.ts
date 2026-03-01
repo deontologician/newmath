@@ -108,18 +108,18 @@ const constraintToggles = document.querySelectorAll<HTMLButtonElement>('.constra
 
 // English names for constraints (adjective form)
 const constraintNames: Record<string, string> = {
-  associativity: 'Associative',
-  commutativity: 'Commutative',
-  leftIdentity: 'Left Identity',
-  rightIdentity: 'Right Identity',
-  leftZero: 'Left Zero',
-  rightZero: 'Right Zero',
-  idempotent: 'Idempotent',
-  medial: 'Medial',
-  leftDistributive: 'Left Distributive',
-  rightDistributive: 'Right Distributive',
-  leftCancellative: 'Left Cancellative',
-  rightCancellative: 'Right Cancellative',
+  associativity: 'associative',
+  commutativity: 'commutative',
+  leftIdentity: 'left identity',
+  rightIdentity: 'right identity',
+  leftZero: 'left zero',
+  rightZero: 'right zero',
+  idempotent: 'idempotent',
+  medial: 'medial',
+  leftDistributive: 'left distributive',
+  rightDistributive: 'right distributive',
+  leftCancellative: 'left cancellative',
+  rightCancellative: 'right cancellative',
 };
 
 // Build equation map from the toggle button text
@@ -415,7 +415,7 @@ function showSolverMessage(text: string) {
 
 function setSolving(active: boolean) {
   state.solving = active;
-  newTableBtn.textContent = active ? 'Creating New Math…' : 'New Math';
+  newTableBtn.textContent = active ? 'creating new math…' : 'new math';
   newTableBtn.classList.toggle('solving', active);
   for (const btn of constraintToggles) {
     btn.disabled = active;
@@ -602,8 +602,8 @@ saveBtn.addEventListener('click', () => {
   storeFavorites(favs);
   renderFavorites();
   // Brief feedback
-  saveBtn.textContent = 'Saved!';
-  setTimeout(() => { saveBtn.textContent = 'Save'; }, 1000);
+  saveBtn.textContent = 'saved!';
+  setTimeout(() => { saveBtn.textContent = 'save'; }, 1000);
 });
 
 ensureReducible();
