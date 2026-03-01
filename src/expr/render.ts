@@ -1,6 +1,40 @@
 import type { Expr, OpNode } from './tree.ts';
 import { isRedex } from './tree.ts';
-import { SYMBOL_NAMES, SYMBOL_COLORS, OP_SYMBOL } from '../symbols.ts';
+import { createSymbolEl, createOperatorEl } from '../symbols.ts';
+
+export interface FlatRenderResult {
+  element: HTMLElement;
+  /** Maps each clickable operator element to the index of its left operand. */
+  opIndexMap: WeakMap<HTMLElement, number>;
+}
+
+/**
+ * Render a list of leaf symbol values as a flat expression with no parens.
+ * Every operator between adjacent symbols is a clickable redex target.
+ */
+export function renderExprFlat(leaves: number[]): FlatRenderResult {
+  const opIndexMap = new WeakMap<HTMLElement, number>();
+  const root = document.createElement('span');
+  root.className = 'expr-root';
+
+  leaves.forEach((val, i) => {
+    const sym = document.createElement('span');
+    sym.className = 'expr-symbol';
+    sym.appendChild(createSymbolEl(val));
+    root.appendChild(sym);
+
+    if (i < leaves.length - 1) {
+      const opEl = document.createElement('span');
+      opEl.className = 'expr-op flat-redex';
+      opEl.tabIndex = 0;
+      opEl.append(' ', createOperatorEl(), ' ');
+      opIndexMap.set(opEl, i);
+      root.appendChild(opEl);
+    }
+  });
+
+  return { element: root, opIndexMap };
+}
 
 export interface RenderResult {
   element: HTMLElement;
@@ -16,7 +50,7 @@ export interface RenderResult {
 export function renderExpr(expr: Expr): RenderResult {
   const nodeMap = new WeakMap<HTMLElement, OpNode>();
   const element = renderNode(expr, nodeMap);
-  element.className = 'expr-root';
+  element.classList.add('expr-root');
   return { element, nodeMap };
 }
 
@@ -24,8 +58,7 @@ function renderNode(expr: Expr, nodeMap: WeakMap<HTMLElement, OpNode>): HTMLElem
   if (expr.kind === 'symbol') {
     const span = document.createElement('span');
     span.className = 'expr-symbol';
-    span.textContent = SYMBOL_NAMES[expr.value];
-    span.style.color = SYMBOL_COLORS[expr.value];
+    span.appendChild(createSymbolEl(expr.value));
     return span;
   }
 
@@ -43,17 +76,15 @@ function renderNode(expr: Expr, nodeMap: WeakMap<HTMLElement, OpNode>): HTMLElem
 
     const left = document.createElement('span');
     left.className = 'expr-symbol';
-    left.textContent = SYMBOL_NAMES[expr.left.value];
-    left.style.color = SYMBOL_COLORS[expr.left.value];
+    left.appendChild(createSymbolEl(expr.left.value));
 
     const opSym = document.createElement('span');
     opSym.className = 'expr-op';
-    opSym.textContent = ` ${OP_SYMBOL} `;
+    opSym.append(' ', createOperatorEl(), ' ');
 
     const right = document.createElement('span');
     right.className = 'expr-symbol';
-    right.textContent = SYMBOL_NAMES[expr.right.value];
-    right.style.color = SYMBOL_COLORS[expr.right.value];
+    right.appendChild(createSymbolEl(expr.right.value));
 
     const close = document.createElement('span');
     close.className = 'expr-paren';
@@ -72,7 +103,7 @@ function renderNode(expr: Expr, nodeMap: WeakMap<HTMLElement, OpNode>): HTMLElem
 
     const opSym = document.createElement('span');
     opSym.className = 'expr-op';
-    opSym.textContent = ` ${OP_SYMBOL} `;
+    opSym.append(' ', createOperatorEl(), ' ');
 
     const rightEl = renderNode(expr.right, nodeMap);
 
