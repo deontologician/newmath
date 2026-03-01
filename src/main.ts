@@ -9,6 +9,8 @@ import { renderTable } from './table/render.ts';
 import { randomizeGlyphs, getGlyphState, setGlyphState } from './symbols.ts';
 import { solve } from './minizinc/index.ts';
 import type { ConstraintName } from './minizinc/index.ts';
+import { propertyTemplates, randomizePropertyVars } from './expr/properties.ts';
+import type { PropertyTemplate } from './expr/properties.ts';
 
 const SYMBOL_COUNT = 4;
 
@@ -63,6 +65,14 @@ function leavesToTree(values: number[]): Expr {
   return tree;
 }
 
+interface PropertyDemo {
+  constraint: ConstraintName;
+  template: PropertyTemplate;
+  vars: number[];
+  lhs: Expr;
+  rhs: Expr;
+}
+
 interface AppState {
   table: OpTable;
   expr: Expr;
@@ -71,6 +81,7 @@ interface AppState {
   animating: boolean;
   selectedConstraints: Set<ConstraintName>;
   solving: boolean;
+  propertyDemo: PropertyDemo | null;
 }
 
 randomizeGlyphs(SYMBOL_COUNT, getFavoriteExclusions());
@@ -84,6 +95,7 @@ const state: AppState = {
   animating: false,
   selectedConstraints: new Set(),
   solving: false,
+  propertyDemo: null,
 };
 
 const tableContainer = document.getElementById('table-container')!;
@@ -94,10 +106,26 @@ const newTableBtn = document.getElementById('new-table-btn')!;
 const solverMessage = document.getElementById('solver-message')!;
 const constraintToggles = document.querySelectorAll<HTMLButtonElement>('.constraint-toggle');
 
-// Build label map from the toggle buttons
-const constraintLabels = new Map<ConstraintName, string>();
+// English names for constraints (adjective form)
+const constraintNames: Record<string, string> = {
+  associativity: 'Associative',
+  commutativity: 'Commutative',
+  leftIdentity: 'Left Identity',
+  rightIdentity: 'Right Identity',
+  leftZero: 'Left Zero',
+  rightZero: 'Right Zero',
+  idempotent: 'Idempotent',
+  medial: 'Medial',
+  leftDistributive: 'Left Distributive',
+  rightDistributive: 'Right Distributive',
+  leftCancellative: 'Left Cancellative',
+  rightCancellative: 'Right Cancellative',
+};
+
+// Build equation map from the toggle button text
+const constraintEquations = new Map<ConstraintName, string>();
 for (const btn of constraintToggles) {
-  constraintLabels.set(
+  constraintEquations.set(
     btn.dataset.constraint as ConstraintName,
     btn.textContent!.trim(),
   );
@@ -116,12 +144,140 @@ function renderTableView() {
   if (state.selectedConstraints.size === 0) return;
 
   for (const name of state.selectedConstraints) {
-    const label = constraintLabels.get(name);
-    if (!label) continue;
+    const equation = constraintEquations.get(name);
+    if (!equation) continue;
     const el = document.createElement('div');
     el.className = 'active-constraint';
-    el.textContent = label;
+
+    const isDemoable = name in propertyTemplates;
+    const isSelected = state.propertyDemo?.constraint === name;
+
+    if (isDemoable) el.classList.add('active-constraint-demoable');
+    if (isSelected) el.classList.add('active-constraint-selected');
+
+    const nameEl = document.createElement('div');
+    nameEl.className = 'active-constraint-name';
+    nameEl.textContent = constraintNames[name] ?? name;
+
+    const eqEl = document.createElement('div');
+    eqEl.className = 'active-constraint-eq';
+    eqEl.textContent = equation;
+
+    el.append(nameEl, eqEl);
+
+    if (isDemoable) {
+      el.addEventListener('click', () => handlePropertyClick(name));
+    }
+
     activeConstraintsEl.appendChild(el);
+  }
+}
+
+function handlePropertyClick(constraint: ConstraintName) {
+  if (state.animating || state.solving) return;
+
+  // Toggle off if same constraint
+  if (state.propertyDemo?.constraint === constraint) {
+    state.propertyDemo = null;
+    renderAll();
+    return;
+  }
+
+  const template = propertyTemplates[constraint];
+  if (!template) return;
+
+  const vars = randomizePropertyVars(template, SYMBOL_COUNT, state.table, constraint);
+  const { lhs, rhs } = template.build(vars);
+  state.propertyDemo = { constraint, template, vars, lhs, rhs };
+  renderAll();
+}
+
+function renderPropertyDemo() {
+  exprContainer.innerHTML = '';
+  const demo = state.propertyDemo!;
+
+  const lhsDone = demo.lhs.kind === 'symbol';
+  const rhsDone = demo.rhs.kind === 'symbol';
+  const bothDone = lhsDone && rhsDone;
+
+  // Container for LHS = RHS
+  const wrapper = document.createElement('span');
+  wrapper.className = 'expr-root';
+  if (bothDone) wrapper.classList.add('property-equation-complete');
+
+  // Render LHS
+  const { element: lhsEl, nodeMap: lhsNodeMap } = renderExpr(demo.lhs);
+  lhsEl.classList.remove('expr-root');
+  lhsEl.classList.add('property-side');
+
+  // Equals sign
+  const eqSign = document.createElement('span');
+  eqSign.className = 'expr-op property-equals';
+  eqSign.textContent = ' = ';
+
+  // Render RHS
+  const { element: rhsEl, nodeMap: rhsNodeMap } = renderExpr(demo.rhs);
+  rhsEl.classList.remove('expr-root');
+  rhsEl.classList.add('property-side');
+
+  wrapper.append(lhsEl, eqSign, rhsEl);
+  exprContainer.appendChild(wrapper);
+
+  if (bothDone) {
+    newExprBtn.classList.add('btn-pulse');
+    return;
+  }
+
+  // Attach redex handlers to LHS
+  if (!lhsDone) {
+    attachRedexHandlers(lhsEl, lhsNodeMap, 'lhs');
+  }
+
+  // Attach redex handlers to RHS
+  if (!rhsDone) {
+    attachRedexHandlers(rhsEl, rhsNodeMap, 'rhs');
+  }
+}
+
+function attachRedexHandlers(
+  element: HTMLElement,
+  nodeMap: WeakMap<HTMLElement, OpNode>,
+  side: 'lhs' | 'rhs',
+) {
+  const redexEls = element.matches('.redex-group')
+    ? [element, ...element.querySelectorAll('.redex-group')]
+    : element.querySelectorAll('.redex-group');
+
+  for (const el of redexEls) {
+    const htmlEl = el as HTMLElement;
+    const node = nodeMap.get(htmlEl);
+    if (!node) continue;
+
+    const handler = () => {
+      if (state.animating || state.solving) return;
+      if (!isRedex(node)) return;
+      state.animating = true;
+
+      animateReduction(
+        htmlEl,
+        node as OpNode & { left: { kind: 'symbol'; value: number }; right: { kind: 'symbol'; value: number } },
+        state.table,
+        () => {
+          const reduced = reduce(state.propertyDemo![side], node, (l, r) => lookup(state.table, l, r));
+          state.propertyDemo![side] = reduced;
+          state.animating = false;
+          renderPropertyDemo();
+        },
+      );
+    };
+
+    htmlEl.addEventListener('click', handler);
+    htmlEl.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        handler();
+      }
+    });
   }
 }
 
@@ -141,6 +297,12 @@ function appendEquationSuffix(element: HTMLElement) {
 
 function renderExprView() {
   exprContainer.innerHTML = '';
+
+  // Property demo mode takes over expression rendering
+  if (state.propertyDemo) {
+    renderPropertyDemo();
+    return;
+  }
 
   // When fully reduced, reset to original for replay
   if (state.expr.kind === 'symbol' && state.reducedSymbol) {
@@ -253,7 +415,7 @@ function showSolverMessage(text: string) {
 
 function setSolving(active: boolean) {
   state.solving = active;
-  newTableBtn.textContent = active ? 'solving…' : 'New Math';
+  newTableBtn.textContent = active ? 'Creating New Math…' : 'New Math';
   newTableBtn.classList.toggle('solving', active);
   for (const btn of constraintToggles) {
     btn.disabled = active;
@@ -281,12 +443,22 @@ for (const btn of constraintToggles) {
 
 newExprBtn.addEventListener('click', () => {
   if (state.animating || state.solving) return;
+  newExprBtn.classList.remove('btn-pulse');
+  newTableBtn.classList.remove('btn-pulse');
+
+  if (state.propertyDemo) {
+    const { template, constraint } = state.propertyDemo;
+    const vars = randomizePropertyVars(template, SYMBOL_COUNT, state.table, constraint);
+    const { lhs, rhs } = template.build(vars);
+    state.propertyDemo = { constraint, template, vars, lhs, rhs };
+    renderExprView();
+    return;
+  }
+
   const e = randomExpr(SYMBOL_COUNT, 5);
   state.expr = e;
   state.originalExpr = e;
   state.reducedSymbol = null;
-  newExprBtn.classList.remove('btn-pulse');
-  newTableBtn.classList.remove('btn-pulse');
   renderExprView();
 });
 
@@ -304,6 +476,7 @@ newTableBtn.addEventListener('click', async () => {
       constraints: [...state.selectedConstraints, 'diversity'],
     });
     state.table = fromSolverResult(result.op);
+    state.propertyDemo = null;
     const e2 = randomExpr(SYMBOL_COUNT, 5);
     state.expr = e2;
     state.originalExpr = e2;
@@ -357,7 +530,7 @@ function renderFavorites(): void {
     // Operator glyph
     if (fav.glyphs.operator !== null) {
       const opImg = document.createElement('img');
-      opImg.src = `/operators/${String(fav.glyphs.operator).padStart(4, '0')}.webp`;
+      opImg.src = `${import.meta.env.BASE_URL}operators/${String(fav.glyphs.operator).padStart(4, '0')}.webp`;
       opImg.className = 'favorite-glyph favorite-op-glyph';
       opImg.draggable = false;
       loadBtn.appendChild(opImg);
@@ -374,7 +547,7 @@ function renderFavorites(): void {
     fav.glyphs.symbols.forEach((id, j) => {
       if (j > 0) setText(', ');
       const img = document.createElement('img');
-      img.src = `/symbols/${String(id).padStart(4, '0')}.webp`;
+      img.src = `${import.meta.env.BASE_URL}symbols/${String(id).padStart(4, '0')}.webp`;
       img.className = 'favorite-glyph';
       img.draggable = false;
       loadBtn.appendChild(img);
@@ -384,6 +557,7 @@ function renderFavorites(): void {
       if (state.animating || state.solving) return;
       setGlyphState(fav.glyphs);
       state.table = fav.table;
+      state.propertyDemo = null;
       const e = randomExpr(fav.table.size, 5);
       state.expr = e;
       state.originalExpr = e;

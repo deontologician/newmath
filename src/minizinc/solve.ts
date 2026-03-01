@@ -6,7 +6,7 @@ import { generateMzn } from "./generate.ts";
 let initPromise: Promise<void> | null = null;
 function ensureInit(): Promise<void> {
   if (!initPromise) {
-    const base = new URL("/wasm/", window.location.origin);
+    const base = new URL(`${import.meta.env.BASE_URL}wasm/`, window.location.origin);
     initPromise = MiniZinc.init({
       workerURL: new URL("minizinc-worker.js", base).href,
       wasmURL: new URL("minizinc.wasm", base).href,

@@ -68,7 +68,7 @@ export function setGlyphState(s: { symbols: number[]; operator: number | null })
 export function createSymbolEl(index: number): HTMLImageElement {
   const fileId = currentSymbols[index];
   const img = document.createElement('img');
-  img.src = `/symbols/${String(fileId).padStart(4, '0')}.webp`;
+  img.src = `${import.meta.env.BASE_URL}symbols/${String(fileId).padStart(4, '0')}.webp`;
   img.className = 'symbol-glyph';
   img.draggable = false;
   return img;
@@ -78,7 +78,7 @@ export function createSymbolEl(index: number): HTMLImageElement {
 export function createOperatorEl(): HTMLElement {
   if (currentOperator !== null) {
     const img = document.createElement('img');
-    img.src = `/operators/${String(currentOperator).padStart(4, '0')}.webp`;
+    img.src = `${import.meta.env.BASE_URL}operators/${String(currentOperator).padStart(4, '0')}.webp`;
     img.className = 'operator-glyph';
     img.draggable = false;
     return img;
